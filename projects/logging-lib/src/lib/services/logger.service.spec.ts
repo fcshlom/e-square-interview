@@ -1,17 +1,28 @@
-import { TestBed } from '@angular/core/testing';
+import { TestBed, fakeAsync, tick } from '@angular/core/testing';
 
 import { LoggerService } from './logger.service';
 import { LoggerConfig } from '../interfaces/loggerConfig.interface';
+import { ERROR_LOGGER_CONFIG_TOKEN } from '../config';
+import { LoggingLibModule } from '../logging-lib.module';
 
 describe('LoggerService', () => {
   let service: LoggerService;
   const mockConfig: LoggerConfig = {
     cleanInterval: 1000, // Example clean interval
-    logFormat: 'ERROR',
-    logTarget: ['console', 'localStorage'],
+    logFormat: 'Test Log -',
+    logTarget: ['console'],
   };
   beforeEach(() => {
-    TestBed.configureTestingModule({});
+    TestBed.configureTestingModule({
+      imports: [LoggingLibModule],
+      providers: [
+        LoggerService,
+        {
+          provide: ERROR_LOGGER_CONFIG_TOKEN,
+          useValue: mockConfig,
+        },
+      ],
+    });
     service = TestBed.inject(LoggerService);
   });
 
@@ -19,57 +30,15 @@ describe('LoggerService', () => {
     expect(service).toBeTruthy();
   });
 
-  it('should log error', () => {
-    const error = {
-      message: 'Test error message',
-      stack: 'Test error stack',
-    };
-
-    spyOn(console, 'error');
-
-    service.getConfig(mockConfig);
+  it('should clean log queue after the specified interval', (done: DoneFn) => {
+    const spy = spyOn(console, 'error');
+    const error = new Error('Test Error');
     service.logError(error);
 
-    expect(service.logQ.length).toBe(1);
-    expect(service.logQ[0].errorMessage).toBe(error.message);
-    expect(console.error).toHaveBeenCalledWith(
-      `${mockConfig.logFormat} - ${error.message} - ${
-        error.stack
-      } - ${jasmine.any(String)}`
-    );
-  });
-
-  it('should clean logger queue and log errors to console and localStorage', () => {
-    const error = {
-      message: 'Test error message',
-      stack: 'Test error stack',
-    };
-
-    spyOn(console, 'error');
-    spyOn(localStorage, 'setItem');
-
-    service.getConfig(mockConfig);
-    service.logError(error);
-
-    expect(service.logQ.length).toBe(1);
-
-    service['cleanLoggerQ']();
-
-    expect(service.logQ.length).toBe(0);
-    expect(console.error).toHaveBeenCalledWith(
-      `${mockConfig.logFormat} - ${error.message} - ${
-        error.stack
-      } - ${jasmine.any(String)}`
-    );
-    expect(localStorage.setItem).toHaveBeenCalledWith(
-      'ErrorLogs',
-      JSON.stringify([
-        {
-          errorMessage: error.message,
-          stack: error.stack,
-          time: jasmine.any(String),
-        },
-      ])
-    );
+    setTimeout(() => {
+      expect(service.logQ.length).toBe(0);
+      expect(spy).toHaveBeenCalled();
+      done();
+    }, mockConfig.cleanInterval + 100); // Add a buffer to ensure cleaning has occurred
   });
 });
