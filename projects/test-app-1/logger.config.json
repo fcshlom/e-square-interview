@@ -1,0 +1,5 @@
+{
+  "logFormat": "Error occurred",
+  "logTarget": ["console"],
+  "cleanInterval": 5000
+}
